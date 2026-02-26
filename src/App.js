@@ -6,11 +6,15 @@ import { motion } from 'framer-motion';
 const ABLY_KEY = process.env.REACT_APP_ABLY_KEY;
 const ZOOM_STEPS = [1, 1.5, 2, 3]; 
 
-// 初始化 Ably
+// 初始化 Ably (增加錯誤防護)
 let ably, channel;
-if (ABLY_KEY) {
-  ably = new Realtime(ABLY_KEY);
-  channel = ably.channels.get('matrix-sync-channel');
+try {
+  if (ABLY_KEY) {
+    ably = new Realtime(ABLY_KEY);
+    channel = ably.channels.get('matrix-sync-channel');
+  }
+} catch (e) {
+  console.error("Ably Init Error:", e);
 }
 
 const App = () => {
@@ -50,73 +54,86 @@ const App = () => {
     <div 
       onDoubleClick={handleDoubleClick}
       style={{
-        width: '100vw',
-        height: '100vh',
-        backgroundColor: '#0f172a', // 深藍色底色，確保不全黑
-        color: 'white',
-        overflow: 'hidden',
-        position: 'relative',
-        cursor: 'pointer'
+        width: '100vw', height: '100vh',
+        backgroundColor: '#0f172a', // 深藍色底色，保證不全黑
+        color: 'white', overflow: 'hidden',
+        position: 'relative', cursor: 'pointer',
+        margin: 0, padding: 0
       }}
     >
-      {/* 狀態標籤 */}
+      {/* 1. 頂部狀態標籤 (使用內聯樣式避開 Tailwind) */}
       <div style={{
         position: 'absolute', top: '20px', left: '20px', zIndex: 100,
-        padding: '10px', background: 'rgba(0,0,0,0.6)', borderRadius: '8px',
-        fontFamily: 'monospace', fontSize: '12px', border: '1px solid #22d3ee'
+        padding: '12px 16px', background: 'rgba(0,0,0,0.7)', 
+        borderRadius: '8px', border: '1px solid #22d3ee',
+        fontFamily: 'monospace', fontSize: '14px', pointerEvents: 'none'
       }}>
-        UNIT_ID: {screenId} | ZOOM: {Math.round(view.scale * 100)}%
+        <div style={{ color: '#22d3ee', fontWeight: 'bold' }}>MATRIX-X5 SYSTEM</div>
+        <div>UNIT_ID: {screenId}</div>
+        <div>ZOOM: {Math.round(view.scale * 100)}%</div>
       </div>
 
-      {/* 核心內容畫布 */}
+      {/* 2. 核心內容畫布 (加上位移補償) */}
       <motion.div
         animate={{ 
           x: view.x - (screenId * window.innerWidth), 
           y: view.y + offsets[screenId],
           scale: view.scale 
         }}
-        transition={{ type: "spring", stiffness: 100, damping: 20 }}
+        transition={{ type: "spring", stiffness: 100, damping: 25 }}
         style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '500vw', // 撐開足夠寬度供 5 台螢幕切換
-          height: '100vh',
-          originX: 0,
-          originY: 0,
-          // 使用穩定圖片網址
+          position: 'absolute', top: 0, left: 0,
+          width: '100%', height: '100%',
+          originX: 0, originY: 0,
           backgroundImage: `url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=2560')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          backgroundColor: '#1e293b'
+          backgroundColor: '#1e293b' // 圖片未載入前的備用色
         }}
       />
 
-      {/* 校準模式 UI */}
+      {/* 3. 校準控制按鈕 */}
       <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100 }}>
         <button 
-          onClick={() => setIsCalibrating(!isCalibrating)}
+          onClick={(e) => { e.stopPropagation(); setIsCalibrating(!isCalibrating); }}
           style={{
-            padding: '8px 16px', borderRadius: '4px', border: 'none',
+            padding: '10px 20px', borderRadius: '6px', border: 'none',
             backgroundColor: isCalibrating ? '#ef4444' : '#22d3ee',
-            color: 'black', fontWeight: 'bold', cursor: 'pointer'
+            color: 'black', fontWeight: 'bold', cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.4)'
           }}
         >
-          {isCalibrating ? 'SAVE' : 'CALIBRATE'}
+          {isCalibrating ? 'SAVE CONFIG' : 'CALIBRATE'}
         </button>
       </div>
 
       {isCalibrating && (
         <div style={{
-          position: 'absolute', bottom: '40px', left: '50%', transform: 'translateX(-50%)',
-          display: 'flex', gap: '20px', zIndex: 110, background: 'rgba(0,0,0,0.8)', padding: '20px', borderRadius: '15px'
+          position: 'absolute', bottom: '50px', left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', gap: '30px', zIndex: 110, 
+          background: 'rgba(15, 23, 42, 0.9)', padding: '25px', 
+          borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
         }}>
-          <button onClick={() => setOffsets(prev => {
-            const n = [...prev]; n[screenId] -= 2; return n;
-          })} style={{ width: '50px', height: '50px', borderRadius: '25px', border: 'none', background: '#334155', color: 'white' }}>▲</button>
-          <button onClick={() => setOffsets(prev => {
-            const n = [...prev]; n[screenId] += 2; return n;
-          })} style={{ width: '50px', height: '50px', borderRadius: '25px', border: 'none', background: '#334155', color: 'white' }}>▼</button>
+          <button 
+            onClick={(e) => { e.stopPropagation(); setOffsets(prev => { const n = [...prev]; n[screenId] -= 2; return n; }); }} 
+            style={{ width: '60px', height: '60px', borderRadius: '30px', border: 'none', background: '#334155', color: 'white', fontSize: '24px', cursor: 'pointer' }}
+          >▲</button>
+          <button 
+            onClick={(e) => { e.stopPropagation(); setOffsets(prev => { const n = [...prev]; n[screenId] += 2; return n; }); }} 
+            style={{ width: '60px', height: '60px', borderRadius: '30px', border: 'none', background: '#334155', color: 'white', fontSize: '24px', cursor: 'pointer' }}
+          >▼</button>
+        </div>
+      )}
+
+      {/* 4. 操作提示 */}
+      {!isCalibrating && (
+        <div style={{
+          position: 'absolute', bottom: '30px', width: '100%', textAlign: 'center',
+          color: 'rgba(255,255,255,0.3)', fontSize: '10px', letterSpacing: '4px',
+          textTransform: 'uppercase', pointerEvents: 'none'
+        }}>
+          Double Tap to Sync Zoom
         </div>
       )}
     </div>
